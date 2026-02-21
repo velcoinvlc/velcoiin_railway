@@ -1,0 +1,9 @@
+{
+  "chain_id": "velcoin-mainnet",
+  "symbol": "VLC",
+  "decimals": 6,
+  "total_supply": 1000000000,
+  "balances": {
+    "6d627bb087faa32a00ed18749af72185de31a038": 1000000000
+  }
+}
