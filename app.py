@@ -824,7 +824,7 @@ EXPLORER_HTML = '''
 
     <footer class="footer">
         <p>VelCoin (VLC) Blockchain Explorer</p>
-        <p>© 2026 VelCoin. All rights reserved.</p>
+        <p>2026 VelCoin. All rights reserved.</p>
     </footer>
 
     <script>
@@ -1224,7 +1224,7 @@ def explorer_block(identifier):
                 <div class="value">From: {tx.get('from', 'N/A')[:20]}... To: {tx.get('to', 'N/A')[:20]}... Amount: {tx.get('amount', 0)} VLC</div>
             </div>
             ''' for i, tx in enumerate(block.get('transactions', [])))}
-            <p><a href="/explorer">← Back to Explorer</a></p>
+            <p><a href="/explorer"> Back to Explorer</a></p>
         </div>
     </body>
     </html>
@@ -1272,7 +1272,7 @@ def explorer_tx(tx_hash):
             {'<div class="field"><div class="label">Block</div><div class="value"><a href="/explorer/block/' + str(tx.get('block_index')) + '">#' + str(tx.get('block_index')) + '</a></div></div>' if tx.get('block_index') else ''}
             {'<div class="field"><div class="label">Confirmations</div><div class="value">' + str(tx.get('confirmations', 0)) + '</div></div>' if tx.get('confirmations') else ''}
             <div class="field"><div class="label">Timestamp</div><div class="value">{datetime.fromtimestamp(tx.get('timestamp', tx.get('received_at', 0)))}</div></div>
-            <p><a href="/explorer">← Back to Explorer</a></p>
+            <p><a href="/explorer"> Back to Explorer</a></p>
         </div>
     </body>
     </html>
@@ -1318,7 +1318,7 @@ def explorer_address(address):
                 {'<div style="font-size: 0.85em;">Block #' + str(t.get('block_index')) + '</div>' if t.get('block_index') else '<div style="font-size: 0.85em; color: #F59E0B;">Pending</div>'}
             </div>
             ''' for t in info['transactions']) if info['transactions'] else '<div style="color: #6B7280;">No transactions found</div>'}
-            <p><a href="/explorer">← Back to Explorer</a></p>
+            <p><a href="/explorer"> Back to Explorer</a></p>
         </div>
     </body>
     </html>
@@ -1473,7 +1473,7 @@ def health():
     return jsonify({
         "status": "healthy",
         "timestamp": int(time.time()),
-        "uptime": int(time.time())  # Simplified - would track actual uptime
+        "uptime": int(time.time())
     })
 
 # -----------------------
