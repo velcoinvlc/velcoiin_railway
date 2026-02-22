@@ -24,6 +24,11 @@ VelCoin (VLC) is a native blockchain-based digital currency with a fixed supply 
 | **Difficulty** | 4 leading zeros |
 | **Address Format** | 40-character hexadecimal |
 | **Genesis Block** | February 2026 |
+| **Founder Address** | 421fe2ca5041d7fcc82f0abb96a7f03080c2e17c |
+
+## Security Warning
+
+**NEVER commit private keys to the repository.** The founder wallet private key must be set as an environment variable only.
 
 ## Quick Start
 
@@ -31,8 +36,8 @@ VelCoin (VLC) is a native blockchain-based digital currency with a fixed supply 
 # Install dependencies
 pip install -r requirements.txt
 
-# Set founder wallet (required)
-export VELCOIN_FUND_WALLET='{"private_key":"...","public_key":"...","address":"..."}'
+# Set founder wallet (REQUIRED - environment variable only)
+export VELCOIN_FUND_WALLET='{"private_key":"TU_CLAVE_PRIVADA_AQUI","public_key":"TU_CLAVE_PUBLICA_AQUI","address":"421fe2ca5041d7fcc82f0abb96a7f03080c2e17c"}'
 
 # Run node
 python app.py
