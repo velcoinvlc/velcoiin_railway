@@ -1,0 +1,13 @@
+{
+  "network_name": "velcoin-mainnet",
+  "network_version": "1.0.0",
+  "min_tx_fee": 0.001,
+  "max_tx_size": 10000,
+  "block_time_target": 60,
+  "explorer_enabled": true,
+  "cors_origins": ["*"],
+  "node_contact": "+13156961731",
+  "node_operator": "Dainier Velazquez",
+  "max_peers": 50,
+  "sync_interval": 30
+}
