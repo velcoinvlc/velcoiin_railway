@@ -1,9 +1,19 @@
 {
-  "chain_id": "velcoin-mainnet",
+  "index": 0,
+  "timestamp": 1738368000,
+  "transactions": [],
+  "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": 0,
+  "merkle_root": "0000000000000000000000000000000000000000000000000000000000000000",
+  "difficulty": 4,
+  "block_hash": "0000a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef12",
+  "network": "velcoin-mainnet",
   "symbol": "VLC",
   "decimals": 6,
+  "version": "1.0.0",
+  "founder": "Dainier Velazquez",
   "total_supply": 1000000000,
   "balances": {
-    "6d627bb087faa32a00ed18749af72185de31a038": 1000000000
+    "421fe2ca5041d7fcc82f0abb96a7f03080c2e17c": 1000000000
   }
 }
