@@ -1,0 +1,8 @@
+{
+  "peers": [],
+  "banned": [],
+  "last_sync": null,
+  "bootstrap_nodes": [
+    "https://velcoin-vlc.onrender.com"
+  ]
+}
