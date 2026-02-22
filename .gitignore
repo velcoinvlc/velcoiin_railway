@@ -26,8 +26,10 @@ var/
 *.log
 logs/
 
-# Environment
+# Environment - NUNCA subir variables de entorno
 .env
+.env.local
+.env.production
 .venv
 
 # IDE
@@ -44,3 +46,10 @@ Thumbs.db
 # Backups
 *.bak
 *.backup
+
+# CRÍTICO: Nunca subir archivos con claves privadas
+*private*
+*secret*
+*key*.json
+wallet*.json
+founder*.json
