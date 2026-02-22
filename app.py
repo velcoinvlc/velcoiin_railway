@@ -27,6 +27,25 @@ PEERS_FILE = os.path.join(BASE_DIR, "peers.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 
 # -----------------------
+# JSON IO (must be defined before use)
+def load_json(path, default):
+    if os.path.exists(path):
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logging.warning(f"Error loading {path}: {e}")
+            return default
+    return default
+
+def save_json(path, data):
+    try:
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logging.warning(f"Error saving {path}: {e}")
+
+# -----------------------
 # CONFIGURATION
 DEFAULT_CONFIG = {
     "network_name": "velcoin-mainnet",
@@ -96,25 +115,6 @@ def sign_tx(private_key, payload):
 def verify_signature(public_key, payload, signature):
     expected = sha256(sha256(public_key) + payload)
     return expected == signature
-
-# -----------------------
-# JSON IO
-def load_json(path, default):
-    if os.path.exists(path):
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            logging.error(f"Error loading {path}: {e}")
-            return default
-    return default
-
-def save_json(path, data):
-    try:
-        with open(path, 'w') as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        logging.error(f"Error saving {path}: {e}")
 
 # -----------------------
 # STATE MANAGEMENT
@@ -428,7 +428,7 @@ else:
     try:
         FUND_WALLET_JSON = json.loads(FUND_WALLET_DATA)
         FUND_WALLET = FUND_WALLET_JSON["address"]
-        logging.info(f"Founder wallet loaded: {FUND_WALLET}")
+        logging.info("Founder wallet loaded successfully")
     except Exception as e:
         logging.error(f"Error loading founder wallet: {e}")
         raise Exception("Invalid founder wallet configuration")
@@ -1192,6 +1192,19 @@ def explorer_block(identifier):
     if not block:
         return "<h1>Block not found</h1>", 404
     
+    tx_html_parts = []
+    for i, tx in enumerate(block.get('transactions', [])):
+        tx_from = tx.get('from', 'N/A')[:20]
+        tx_to = tx.get('to', 'N/A')[:20]
+        tx_amount = tx.get('amount', 0)
+        tx_html_parts.append(
+            f'<div class="field">'
+            f'<div class="label">TX {i+1}</div>'
+            f'<div class="value">From: {tx_from}... To: {tx_to}... Amount: {tx_amount} VLC</div>'
+            f'</div>'
+        )
+    tx_html = ''.join(tx_html_parts)
+
     html = f'''
     <!DOCTYPE html>
     <html>
@@ -1218,12 +1231,7 @@ def explorer_block(identifier):
             <div class="field"><div class="label">Transactions</div><div class="value">{len(block.get('transactions', []))}</div></div>
             <div class="field"><div class="label">Difficulty</div><div class="value">{block.get('difficulty', DIFFICULTY)}</div></div>
             <h2 style="margin-top: 30px; color: #A78BFA;">Transactions</h2>
-            {''.join(f'''
-            <div class="field">
-                <div class="label">TX {i+1}</div>
-                <div class="value">From: {tx.get('from', 'N/A')[:20]}... To: {tx.get('to', 'N/A')[:20]}... Amount: {tx.get('amount', 0)} VLC</div>
-            </div>
-            ''' for i, tx in enumerate(block.get('transactions', [])))}
+            {tx_html}
             <p><a href="/explorer"> Back to Explorer</a></p>
         </div>
     </body>
@@ -1287,7 +1295,28 @@ def explorer_address(address):
         return "<h1>Invalid address</h1>", 400
     
     info = get_wallet_balance(address)
-    
+
+    tx_html_parts = []
+    if info['transactions']:
+        for t in info['transactions']:
+            direction = 'SENT' if t.get('from') == address else 'RECEIVED'
+            amount = t.get('amount', 0)
+            ts = datetime.fromtimestamp(t.get('timestamp', t.get('received_at', 0)))
+            if t.get('block_index'):
+                block_info = f'<div style="font-size: 0.85em;">Block #{t.get("block_index")}</div>'
+            else:
+                block_info = '<div style="font-size: 0.85em; color: #F59E0B;">Pending</div>'
+            tx_html_parts.append(
+                f'<div class="tx">'
+                f'<div>{direction} {amount} VLC</div>'
+                f'<div style="font-size: 0.9em; color: #9CA3AF;">{ts}</div>'
+                f'{block_info}'
+                f'</div>'
+            )
+        tx_html = ''.join(tx_html_parts)
+    else:
+        tx_html = '<div style="color: #6B7280;">No transactions found</div>'
+
     html = f'''
     <!DOCTYPE html>
     <html>
@@ -1311,13 +1340,7 @@ def explorer_address(address):
             <div class="balance">{info['balance']} VLC</div>
             <div class="field"><div class="label">Total Transactions</div><div>{info['transaction_count']}</div></div>
             <h2 style="margin-top: 30px; color: #A78BFA;">Recent Transactions</h2>
-            {''.join(f'''
-            <div class="tx">
-                <div>{'SENT' if t.get('from') == address else 'RECEIVED'} {t.get('amount', 0)} VLC</div>
-                <div style="font-size: 0.9em; color: #9CA3AF;">{datetime.fromtimestamp(t.get('timestamp', t.get('received_at', 0)))}</div>
-                {'<div style="font-size: 0.85em;">Block #' + str(t.get('block_index')) + '</div>' if t.get('block_index') else '<div style="font-size: 0.85em; color: #F59E0B;">Pending</div>'}
-            </div>
-            ''' for t in info['transactions']) if info['transactions'] else '<div style="color: #6B7280;">No transactions found</div>'}
+            {tx_html}
             <p><a href="/explorer"> Back to Explorer</a></p>
         </div>
     </body>
@@ -1504,6 +1527,17 @@ def initialize():
 # Run initialization
 initialize()
 
+# Gunicorn importarÃ¡ directamente la variable `app`
+# Este bloque solo se ejecuta si corres: python app.py
+
 if __name__ == "__main__":
+    import os
+
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, threaded=True)
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False,
+        threaded=True
+    )
