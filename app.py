@@ -10,8 +10,17 @@ from functools import wraps
 from collections import defaultdict
 from datetime import datetime
 import threading
+import base64
+import requests
 
 app = Flask(__name__)
+
+# -----------------------
+# GITHUB BACKUP CONFIG
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPO = "velcoinvlc/velcoin-backups"
+GITHUB_BRANCH = "main"
+BACKUP_FILES = ["state.json", "blockchain.json", "mempool.json", "nonces.json", "ledger.json"]
 
 # -----------------------
 # PATHS
@@ -25,6 +34,135 @@ NONCE_FILE = os.path.join(BASE_DIR, "nonces.json")
 LOG_FILE = os.path.join(BASE_DIR, "node.log")
 PEERS_FILE = os.path.join(BASE_DIR, "peers.json")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+
+# -----------------------
+# GITHUB BACKUP FUNCTIONS
+def github_api_request(method, path, data=None):
+    """Hace peticiones a la API de GitHub"""
+    if not GITHUB_TOKEN:
+        return None
+    
+    url = f"https://api.github.com/repos/{GITHUB_REPO}{path}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        if method == "GET":
+            response = requests.get(url, headers=headers, timeout=30)
+        elif method == "PUT":
+            response = requests.put(url, headers=headers, json=data, timeout=30)
+        else:
+            return None
+        
+        return response
+    except Exception as e:
+        logging.error(f"GitHub API error: {e}")
+        return None
+
+def get_file_sha(filepath):
+    """Obtiene el SHA de un archivo en GitHub"""
+    response = github_api_request("GET", f"/contents/{filepath}?ref={GITHUB_BRANCH}")
+    if response and response.status_code == 200:
+        return response.json().get("sha")
+    return None
+
+def backup_file_to_github(filepath, github_path):
+    """Sube un archivo individual a GitHub"""
+    if not os.path.exists(filepath):
+        return False
+    
+    try:
+        with open(filepath, "rb") as f:
+            content = base64.b64encode(f.read()).decode()
+        
+        sha = get_file_sha(github_path)
+        
+        data = {
+            "message": f"Backup {github_path} - {int(time.time())}",
+            "content": content,
+            "branch": GITHUB_BRANCH
+        }
+        if sha:
+            data["sha"] = sha
+        
+        response = github_api_request("PUT", f"/contents/{github_path}", data)
+        return response and response.status_code in [200, 201]
+    except Exception as e:
+        logging.error(f"Error backing up {filepath}: {e}")
+        return False
+
+def restore_file_from_github(github_path, local_path):
+    """Descarga un archivo desde GitHub"""
+    response = github_api_request("GET", f"/contents/{github_path}?ref={GITHUB_BRANCH}")
+    if not response or response.status_code != 200:
+        return False
+    
+    try:
+        content = base64.b64decode(response.json()["content"])
+        with open(local_path, "wb") as f:
+            f.write(content)
+        logging.info(f"Restored {github_path} from GitHub")
+        return True
+    except Exception as e:
+        logging.error(f"Error restoring {github_path}: {e}")
+        return False
+
+def backup_all_to_github():
+    """Hace backup de todos los archivos críticos"""
+    if not GITHUB_TOKEN:
+        logging.warning("GITHUB_TOKEN not set, skipping backup")
+        return
+    
+    logging.info("Starting GitHub backup...")
+    for filename in BACKUP_FILES:
+        filepath = os.path.join(BASE_DIR, filename)
+        if os.path.exists(filepath):
+            success = backup_file_to_github(filepath, filename)
+            status = "✓" if success else "✗"
+            logging.info(f"{status} {filename}")
+    logging.info("GitHub backup completed")
+
+def restore_all_from_github():
+    """Restaura todos los archivos desde GitHub"""
+    if not GITHUB_TOKEN:
+        logging.warning("GITHUB_TOKEN not set, skipping restore")
+        return False
+    
+    logging.info("Attempting to restore from GitHub...")
+    restored_any = False
+    
+    for filename in BACKUP_FILES:
+        local_path = os.path.join(BASE_DIR, filename)
+        # Solo restaurar si el archivo no existe localmente o está vacío
+        should_restore = False
+        if not os.path.exists(local_path):
+            should_restore = True
+        else:
+            try:
+                with open(local_path, 'r') as f:
+                    content = json.load(f)
+                    if not content:  # Archivo vacío
+                        should_restore = True
+            except:
+                should_restore = True
+        
+        if should_restore:
+            success = restore_file_from_github(filename, local_path)
+            if success:
+                restored_any = True
+                logging.info(f"✓ Restored {filename}")
+            else:
+                logging.info(f"✗ Could not restore {filename}")
+    
+    if restored_any:
+        logging.info("Restore from GitHub completed")
+    else:
+        logging.info("No files needed restoration")
+    
+    return restored_any
 
 # -----------------------
 # JSON IO (must be defined before use)
@@ -123,6 +261,8 @@ def load_state():
 
 def save_state(x):
     save_json(STATE_FILE, x)
+    # Backup automático después de guardar
+    threading.Thread(target=backup_file_to_github, args=(STATE_FILE, "state.json"), daemon=True).start()
 
 def get_address_history(address):
     """Get complete transaction history for an address"""
@@ -153,6 +293,7 @@ def load_nonces():
 
 def save_nonces(x):
     save_json(NONCE_FILE, x)
+    threading.Thread(target=backup_file_to_github, args=(NONCE_FILE, "nonces.json"), daemon=True).start()
 
 def get_next_nonce(address):
     nonces = load_nonces()
@@ -165,6 +306,7 @@ def load_ledger():
 
 def save_ledger(x):
     save_json(LEDGER_FILE, x)
+    threading.Thread(target=backup_file_to_github, args=(LEDGER_FILE, "ledger.json"), daemon=True).start()
 
 def ensure_ledger():
     if not os.path.exists(LEDGER_FILE):
@@ -190,6 +332,7 @@ def load_mempool():
 
 def save_mempool(x):
     save_json(MEMPOOL_FILE, x)
+    threading.Thread(target=backup_file_to_github, args=(MEMPOOL_FILE, "mempool.json"), daemon=True).start()
 
 def add_tx_to_mempool(tx):
     mempool = load_mempool()
@@ -213,6 +356,7 @@ def load_blockchain():
 
 def save_blockchain(x):
     save_json(BLOCKCHAIN_FILE, x)
+    threading.Thread(target=backup_file_to_github, args=(BLOCKCHAIN_FILE, "blockchain.json"), daemon=True).start()
 
 DIFFICULTY = 4
 
@@ -1509,6 +1653,9 @@ def initialize():
     logging.info(f"Version: {CONFIG['network_version']}")
     logging.info("=" * 50)
     
+    # PRIMERO: Intentar restaurar desde GitHub
+    restore_all_from_github()
+    
     # Create genesis block if needed
     genesis = create_genesis_block()
     logging.info(f"Genesis block: {genesis['block_hash'][:16]}...")
@@ -1527,7 +1674,7 @@ def initialize():
 # Run initialization
 initialize()
 
-# Gunicorn importarÃ¡ directamente la variable `app`
+# Gunicorn importará directamente la variable `app`
 # Este bloque solo se ejecuta si corres: python app.py
 
 if __name__ == "__main__":
