@@ -104,11 +104,82 @@ def restore_file_from_github(github_path, local_path):
         content = base64.b64decode(response.json()["content"])
         with open(local_path, "wb") as f:
             f.write(content)
-        logging.info(f"Restored {github_path} from GitHub")
+        logging.info(f"✓ RESTORED {github_path} from GitHub ({len(content)} bytes)")
         return True
     except Exception as e:
-        logging.error(f"Error restoring {github_path}: {e}")
+        logging.error(f"✗ Error restoring {github_path}: {e}")
         return False
+
+def restore_all_from_github():
+    """Restaura TODOS los archivos desde GitHub, sobrescribiendo locales si existen en GitHub"""
+    if not GITHUB_TOKEN:
+        logging.warning("GITHUB_TOKEN not set, skipping restore")
+        return False
+    
+    logging.info("=" * 50)
+    logging.info("STARTING RESTORE FROM GITHUB")
+    logging.info(f"Repository: {GITHUB_REPO}")
+    logging.info(f"Branch: {GITHUB_BRANCH}")
+    logging.info("=" * 50)
+    
+    restored_any = False
+    
+    for filename in BACKUP_FILES:
+        local_path = os.path.join(BASE_DIR, filename)
+        
+        # SIEMPRE intentar restaurar si existe en GitHub
+        # Primero verificar si existe en GitHub
+        logging.info(f"Checking {filename} in GitHub...")
+        response = github_api_request("GET", f"/contents/{filename}?ref={GITHUB_BRANCH}")
+        
+        if not response:
+            logging.warning(f"✗ No response from GitHub for {filename}")
+            continue
+            
+        if response.status_code == 404:
+            logging.info(f"- {filename} not found in GitHub (will be created later)")
+            continue
+            
+        if response.status_code != 200:
+            logging.error(f"✗ GitHub error {response.status_code} for {filename}: {response.text[:200]}")
+            continue
+        
+        # Existe en GitHub, intentar restaurar SIEMPRE
+        logging.info(f"Found {filename} in GitHub, restoring...")
+        
+        # Eliminar archivo local si existe para forzar restauración limpia
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+                logging.info(f"  Removed existing local {filename}")
+            except Exception as e:
+                logging.warning(f"  Could not remove existing {filename}: {e}")
+        
+        # Restaurar desde GitHub
+        success = restore_file_from_github(filename, local_path)
+        if success:
+            restored_any = True
+            # Verificar que se restauró correctamente
+            try:
+                with open(local_path, 'r') as f:
+                    content = json.load(f)
+                    if isinstance(content, list):
+                        logging.info(f"  Verified: {len(content)} items in {filename}")
+                    elif isinstance(content, dict):
+                        logging.info(f"  Verified: {len(content)} keys in {filename}")
+            except Exception as e:
+                logging.warning(f"  Could not verify {filename}: {e}")
+        else:
+            logging.error(f"✗ FAILED to restore {filename}")
+    
+    logging.info("=" * 50)
+    if restored_any:
+        logging.info("RESTORE COMPLETED SUCCESSFULLY")
+    else:
+        logging.info("NO FILES WERE RESTORED (may not exist in GitHub)")
+    logging.info("=" * 50)
+    
+    return restored_any
 
 def backup_all_to_github():
     """Hace backup de todos los archivos críticos"""
@@ -124,62 +195,6 @@ def backup_all_to_github():
             status = "✓" if success else "✗"
             logging.info(f"{status} {filename}")
     logging.info("GitHub backup completed")
-
-def restore_all_from_github():
-    """Restaura todos los archivos desde GitHub"""
-    if not GITHUB_TOKEN:
-        logging.warning("GITHUB_TOKEN not set, skipping restore")
-        return False
-    
-    logging.info("Attempting to restore from GitHub...")
-    restored_any = False
-    
-    for filename in BACKUP_FILES:
-        local_path = os.path.join(BASE_DIR, filename)
-        # Siempre intentar restaurar si existe en GitHub, sobrescribiendo archivos locales vacíos o corruptos
-        should_restore = False
-        
-        # Verificar si existe en GitHub primero
-        response = github_api_request("GET", f"/contents/{filename}?ref={GITHUB_BRANCH}")
-        if not response or response.status_code != 200:
-            logging.info(f"✗ {filename} not found in GitHub")
-            continue
-            
-        # Si no existe localmente, restaurar
-        if not os.path.exists(local_path):
-            should_restore = True
-            logging.info(f"{filename} missing locally, will restore from GitHub")
-        else:
-            # Si existe localmente, verificar si está vacío o corrupto
-            try:
-                with open(local_path, 'r') as f:
-                    content = json.load(f)
-                    # Si está vacío (lista o dict vacío), restaurar
-                    if not content:
-                        should_restore = True
-                        logging.info(f"{filename} is empty locally, will restore from GitHub")
-                    else:
-                        # Si tiene contenido válido, no restaurar para no sobrescribir datos buenos
-                        logging.info(f"{filename} exists locally with data, skipping restore")
-            except (json.JSONDecodeError, Exception) as e:
-                # Si está corrupto, restaurar
-                should_restore = True
-                logging.warning(f"{filename} is corrupted locally ({e}), will restore from GitHub")
-        
-        if should_restore:
-            success = restore_file_from_github(filename, local_path)
-            if success:
-                restored_any = True
-                logging.info(f"✓ Restored {filename}")
-            else:
-                logging.info(f"✗ Could not restore {filename}")
-    
-    if restored_any:
-        logging.info("Restore from GitHub completed")
-    else:
-        logging.info("No files needed restoration")
-    
-    return restored_any
 
 # -----------------------
 # JSON IO (must be defined before use)
@@ -1670,12 +1685,25 @@ def initialize():
     logging.info(f"Version: {CONFIG['network_version']}")
     logging.info("=" * 50)
     
-    # PRIMERO: Intentar restaurar desde GitHub
+    # PRIMERO: Intentar restaurar desde GitHub (ANTES de cualquier otra operación)
     restore_all_from_github()
     
-    # Create genesis block if needed
-    genesis = create_genesis_block()
-    logging.info(f"Genesis block: {genesis['block_hash'][:16]}...")
+    # AHORA cargar los datos (ya restaurados o nuevos)
+    chain = load_blockchain()
+    state = load_state()
+    
+    logging.info(f"Loaded blockchain: {len(chain)} blocks")
+    logging.info(f"Loaded state: {len(state)} addresses")
+    if state:
+        total_supply = sum(state.values())
+        logging.info(f"Total supply: {total_supply} VLC")
+    
+    # Create genesis block ONLY if no blockchain exists
+    if not chain:
+        genesis = create_genesis_block()
+        logging.info(f"Genesis block created: {genesis['block_hash'][:16]}...")
+    else:
+        logging.info(f"Using existing chain, last block: {chain[-1]['block_hash'][:16]}...")
     
     # Ensure ledger exists
     ensure_ledger()
@@ -1683,8 +1711,9 @@ def initialize():
     # Ensure pool tracking
     ensure_pool()
     
-    # Initialize nonces
-    save_nonces(load_nonces())
+    # Initialize nonces if empty
+    if not load_nonces():
+        save_nonces({})
     
     logging.info("Node initialization complete")
 
