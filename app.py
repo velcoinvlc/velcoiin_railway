@@ -136,18 +136,35 @@ def restore_all_from_github():
     
     for filename in BACKUP_FILES:
         local_path = os.path.join(BASE_DIR, filename)
-        # Solo restaurar si el archivo no existe localmente o está vacío
+        # Siempre intentar restaurar si existe en GitHub, sobrescribiendo archivos locales vacíos o corruptos
         should_restore = False
+        
+        # Verificar si existe en GitHub primero
+        response = github_api_request("GET", f"/contents/{filename}?ref={GITHUB_BRANCH}")
+        if not response or response.status_code != 200:
+            logging.info(f"✗ {filename} not found in GitHub")
+            continue
+            
+        # Si no existe localmente, restaurar
         if not os.path.exists(local_path):
             should_restore = True
+            logging.info(f"{filename} missing locally, will restore from GitHub")
         else:
+            # Si existe localmente, verificar si está vacío o corrupto
             try:
                 with open(local_path, 'r') as f:
                     content = json.load(f)
-                    if not content:  # Archivo vacío
+                    # Si está vacío (lista o dict vacío), restaurar
+                    if not content:
                         should_restore = True
-            except:
+                        logging.info(f"{filename} is empty locally, will restore from GitHub")
+                    else:
+                        # Si tiene contenido válido, no restaurar para no sobrescribir datos buenos
+                        logging.info(f"{filename} exists locally with data, skipping restore")
+            except (json.JSONDecodeError, Exception) as e:
+                # Si está corrupto, restaurar
                 should_restore = True
+                logging.warning(f"{filename} is corrupted locally ({e}), will restore from GitHub")
         
         if should_restore:
             success = restore_file_from_github(filename, local_path)
