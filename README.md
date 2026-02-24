@@ -1,6 +1,6 @@
 # VelCoin (VLC) - Native Blockchain
 
-[![Network Status](https://img.shields.io/badge/network-online-success)](https://velcoin-vlc.onrender.com/status)
+[![Network Status](https://img.shields.io/badge/network-online-success)](https://velcoin-vlc-l3uk.onrender.com/status)
 [![Version](https://img.shields.io/badge/version-1.0.0-blueviolet)](https://velcoin-vlc.onrender.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -9,9 +9,9 @@ VelCoin (VLC) is a native blockchain-based digital currency with a fixed supply 
 ## Official Links
 
 - **Website:** https://velcoin-vlc.onrender.com
-- **Explorer:** https://velcoin-vlc.onrender.com/explorer
-- **API Docs:** https://velcoin-vlc.onrender.com/docs
-- **Mainnet Status:** https://velcoin-vlc.onrender.com/status
+- **Explorer:** https://velcoin-vlc-l3uk.onrender.com/explorer
+- **API Docs:** https://velcoin-vlc-l3uk.onrender.com/docs
+- **Mainnet Status:** https://velcoin-vlc-l3uk.onrender.com/status
 
 ## Network Specifications
 
