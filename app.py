@@ -1218,37 +1218,6 @@ def get_tx_endpoint(tx_hash):
     return jsonify(tx)
 
 @app.route("/api/tx/<tx_hash>")
- Add transaction count
-    for b in blocks:
-        b['tx_count'] = len(b.get('transactions', []))
-    
-    return jsonify(blocks)
-
-@app.route("/block/<identifier>")
-@rate_limit()
-def get_block(identifier):
-    """Get block by index or hash"""
-    # Try index first
-    if identifier.isdigit():
-        block = get_block_by_index(int(identifier))
-    else:
-        block = get_block_by_hash(identifier)
-    
-    if not block:
-        return jsonify({"error": "Block not found"}), 404
-    
-    return jsonify(block)
-
-@app.route("/tx/<tx_hash>")
-@rate_limit()
-def get_tx_endpoint(tx_hash):
-    """Get transaction by hash"""
-    tx = get_transaction(tx_hash)
-    if not tx:
-        return jsonify({"error": "Transaction not found"}), 404
-    return jsonify(tx)
-
-@app.route("/api/tx/<tx_hash>")
 @rate_limit()
 def api_tx(tx_hash):
     """API transaction endpoint"""
@@ -1415,47 +1384,6 @@ def explorer_block(identifier):
             f'<div class="field">'
             f'<div class="label">TX {i+1}</div>'
             f'<div class="value">From: {tx_from}... To: {tx_to}... Amount: {tx_amount} VLC</div>'
-            f'</div>'
-        )
-    tx_html = ''.join(tx_html_parts)
-
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Block #{block['index']} | VelCoin Explorer</title>
-        <style>
-            body {{ font-family: sans-serif; background: #0f0d1a; color: #e5e7eb; padding: 40px; }}
-            .container {{ max-width: 900px; margin: 0 auto; }}
-            h1 {{ color: #8B5CF6; }}
-            .field {{ background: rgba(139,92,246,0.1); padding: 15px; margin: 10px 0; border-radius: 8px; }}
-            .label {{ color: #A78BFA; font-size: 0.9em; }}
-            .value {{ font-family: monospace; word-break: break-all; }}
-            a {{ color: #8B5CF6; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Block #{block['index']}</h1>
-            <div class="field"><div class="label">Block Hash</div><div class="value">{block['block_hash']}</div></div>
-            <div class="field"><div class="label">Previous Hash</div><div class="value">{block['previous_hash']}</div></div>
-            <div class="field"><div class="label">Timestamp</div><div class="value">{datetime.fromtimestamp(block['timestamp'])}</div></div>
-            <div class="field"><div class="label">Nonce</div><div class="value">{block['nonce']}</div></div>
-            <div class="field"><div class="label">Merkle Root</div><div class="value">{block.get('merkle_root', 'N/A')}</div></div>
-            <div class="field"><div class="label">Transactions</div><div class="value">{len(block.get('transactions', []))}</div></div>
-            <div class="field"><div class="label">Difficulty</div><div class="value">{block.get('difficulty', DIFFICULTY)}</div></div>
-            <h2 style="margin-top: 30px; color: #A78BFA;">Transactions</h2>
-            {tx_html}
-            <p> href="/explorer"> Back to Explorer</a></p>
-        </div>
-    </body>
-    </html>
-    '''
-    return html
-
-@app.route("/explorer/tx/<tx_hash>")
-@rate_limit()
-def explorer_tx(tx_from}... To: {tx_to}... Amount: {tx_amount} VLC</div>'
             f'</div>'
         )
     tx_html = ''.join(tx_html_parts)
