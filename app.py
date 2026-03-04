@@ -491,9 +491,10 @@ def mine_block(transactions, miner_address=None):
         # Clear mempool
         save_mempool([])
         
-        # Update ledger
+                # Update ledger and add hash to transactions
         for tx in transactions:
             tx_hash = sha256(json.dumps(tx, sort_keys=True))
+            tx['hash'] = tx_hash
             add_to_ledger(tx_hash, tx, block['index'])
         
         logging.info(f"Block mined: {block_hash} | Txs: {len(transactions)} | Nonce: {block['nonce']} | Time: {block['hashing_time']}s")
@@ -1376,16 +1377,26 @@ def explorer_block(identifier):
         return "<h1>Block not found</h1>", 404
     
     tx_html_parts = []
-    for i, tx in enumerate(block.get('transactions', [])):
-        tx_from = tx.get('from', 'N/A')[:20]
-        tx_to = tx.get('to', 'N/A')[:20]
-        tx_amount = tx.get('amount', 0)
-        tx_html_parts.append(
-            f'<div class="field">'
-            f'<div class="label">TX {i+1}</div>'
-            f'<div class="value">From: {tx_from}... To: {tx_to}... Amount: {tx_amount} VLC</div>'
-            f'</div>'
-        )
+for i, tx in enumerate(block.get('transactions', [])):
+    tx_hash = sha256(json.dumps(tx, sort_keys=True))
+    tx_from = tx.get('from', 'N/A')[:20]
+    tx_to = tx.get('to', 'N/A')[:20]
+    tx_amount = tx.get('amount', 0)
+    tx_html_parts.append(
+        f'<div class="field" style="margin: 15px 0; padding: 20px;">'
+        f'<div class="label">TX {i+1}</div>'
+        f'<div class="value" style="margin: 8px 0;">'
+        f'<a href="/explorer/tx/{tx_hash}" style="color: #A78BFA; text-decoration: none; font-size: 0.95em;">'
+        f'{tx_hash[:40]}...'
+        f'</a>'
+        f'</div>'
+        f'<div style="color: #9CA3AF; font-size: 0.9em; margin-top: 10px;">'
+        f'From: <span style="color: #E5E7EB;">{tx_from}...</span> → '
+        f'To: <span style="color: #E5E7EB;">{tx_to}...</span> | '
+        f'<span style="color: #10B981; font-weight: 600;">{tx_amount} VLC</span>'
+        f'</div>'
+        f'</div>'
+    )
     tx_html = ''.join(tx_html_parts)
 
     html = f'''
