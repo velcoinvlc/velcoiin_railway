@@ -543,28 +543,53 @@ def get_transaction(tx_hash):
     chain = load_blockchain()
     for block in chain:
         for tx in block.get('transactions', []):
-            if sha256(json.dumps(tx, sort_keys=True)) == tx_hash:
-                return {
-                    'status': 'confirmed',
-                    'confirmations': len(chain) - block['index'],
-                    'block_index': block['index'],
-                    'block_hash': block['block_hash'],
-                    'timestamp': block['timestamp'],
-                    **tx
-                }
+            # Primero revisar si la transacción ya tiene hash guardado
+            tx_stored_hash = tx.get('hash')
+            if tx_stored_hash:
+                if tx_stored_hash == tx_hash:
+                    return {
+                        'status': 'confirmed',
+                        'confirmations': len(chain) - block['index'],
+                        'block_index': block['index'],
+                        'block_hash': block['block_hash'],
+                        'timestamp': block['timestamp'],
+                        **tx
+                    }
+            else:
+                # Recalcular ignorando el campo 'hash' si existiera
+                tx_copy = {k: v for k, v in tx.items() if k != 'hash'}
+                if sha256(json.dumps(tx_copy, sort_keys=True)) == tx_hash:
+                    return {
+                        'status': 'confirmed',
+                        'confirmations': len(chain) - block['index'],
+                        'block_index': block['index'],
+                        'block_hash': block['block_hash'],
+                        'timestamp': block['timestamp'],
+                        **tx
+                    }
     
     # Search in mempool
     mempool = load_mempool()
     for tx in mempool:
-        if sha256(json.dumps(tx, sort_keys=True)) == tx_hash:
-            return {
-                'status': 'pending',
-                'confirmations': 0,
-                **tx
-            }
+        tx_stored_hash = tx.get('hash')
+        if tx_stored_hash:
+            if tx_stored_hash == tx_hash:
+                return {
+                    'status': 'pending',
+                    'confirmations': 0,
+                    **tx
+                }
+        else:
+            tx_copy = {k: v for k, v in tx.items() if k != 'hash'}
+            if sha256(json.dumps(tx_copy, sort_keys=True)) == tx_hash:
+                return {
+                    'status': 'pending',
+                    'confirmations': 0,
+                    **tx
+                }
     
     return None
-
+    
 # -----------------------
 # NETWORK STATS
 def get_network_stats():
