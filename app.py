@@ -454,25 +454,39 @@ def calculate_merkle_root(transactions):
     
     return tx_hashes[0]
 
-def mine_block(transactions, miner_address=None):
+   def mine_block(transactions, miner_address=None):
     """Mine a new block with given transactions"""
     chain = load_blockchain()
     last_block = chain[-1]
     
-    # Calculate merkle root
-    merkle_root = calculate_merkle_root(transactions)
+    # Preparar transacciones: calcular hash canónico (sin incluir campo 'hash')
+    prepared_txs = []
+    for tx in transactions:
+        # Crear copia sin campo 'hash' para calcular hash consistente
+        tx_clean = {k: v for k, v in tx.items() if k != 'hash'}
+        tx_hash = sha256(json.dumps(tx_clean, sort_keys=True, separators=(', ', ': ')))
+        
+        # Añadir hash a la transacción
+        tx['hash'] = tx_hash
+        prepared_txs.append(tx)
+        
+        # Actualizar ledger
+        add_to_ledger(tx_hash, tx, last_block["index"] + 1)
+    
+    # Calculate merkle root con los hashes ya calculados
+    merkle_root = calculate_merkle_root(prepared_txs)
     
     block = {
         "index": last_block["index"] + 1,
         "timestamp": int(time.time()),
-        "transactions": transactions,
+        "transactions": prepared_txs,  # ← TXs con hash incluido
         "previous_hash": last_block["block_hash"],
         "merkle_root": merkle_root,
         "nonce": 0,
         "difficulty": DIFFICULTY,
         "miner": miner_address
     }
-    
+     
     # Mining loop
     start_time = time.time()
     while True:
@@ -1382,19 +1396,17 @@ def explorer_txs():
 @app.route("/explorer/block/<identifier>")
 @rate_limit()
 def explorer_block(identifier):
-    """Explorer block detail page"""
-    # Try index first
-    if identifier.isdigit():
-        block = get_block_by_index(int(identifier))
-    else:
-        block = get_block_by_hash(identifier)
-    
-    if not block:
-        return "<h1>Block not found</h1>", 404
+    # ... código anterior ...
     
     tx_html_parts = []
     for i, tx in enumerate(block.get('transactions', [])):
-        tx_hash = sha256(json.dumps(tx, sort_keys=True))
+        # Usar el hash almacenado, no recalcular
+        tx_hash = tx.get('hash')
+        if not tx_hash:
+            # Fallback: recalcular si no existe (transacciones antiguas)
+            tx_clean = {k: v for k, v in tx.items() if k != 'hash'}
+            tx_hash = sha256(json.dumps(tx_clean, sort_keys=True, separators=(', ', ': ')))
+        
         tx_from = tx.get('from', 'N/A')[:20]
         tx_to = tx.get('to', 'N/A')[:20]
         tx_amount = tx.get('amount', 0)
@@ -1403,7 +1415,7 @@ def explorer_block(identifier):
             f'<div class="label">TX {i+1}</div>'
             f'<div class="value" style="margin: 8px 0;">'
             f'<a href="/explorer/tx/{tx_hash}" style="color: #A78BFA; text-decoration: none; font-size: 0.95em;">'
-            f'{tx_hash[:40]}...'
+            f'{tx_hash[:40]}...'  # ← Mostrar hash canónico
             f'</a>'
             f'</div>'
             f'<div style="color: #9CA3AF; font-size: 0.9em; margin-top: 10px;">'
@@ -1413,6 +1425,7 @@ def explorer_block(identifier):
             f'</div>'
             f'</div>'
         )
+
     tx_html = ''.join(tx_html_parts)
 
     html = f'''
