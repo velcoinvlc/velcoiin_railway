@@ -454,7 +454,7 @@ def calculate_merkle_root(transactions):
     
     return tx_hashes[0]
 
-   def mine_block(transactions, miner_address=None):
+def mine_block(transactions, miner_address=None):
     """Mine a new block with given transactions"""
     chain = load_blockchain()
     last_block = chain[-1]
@@ -486,7 +486,7 @@ def calculate_merkle_root(transactions):
         "difficulty": DIFFICULTY,
         "miner": miner_address
     }
-     
+    
     # Mining loop
     start_time = time.time()
     while True:
@@ -504,12 +504,6 @@ def calculate_merkle_root(transactions):
         
         # Clear mempool
         save_mempool([])
-        
-                # Update ledger and add hash to transactions
-        for tx in transactions:
-            tx_hash = sha256(json.dumps(tx, sort_keys=True))
-            tx['hash'] = tx_hash
-            add_to_ledger(tx_hash, tx, block['index'])
         
         logging.info(f"Block mined: {block_hash} | Txs: {len(transactions)} | Nonce: {block['nonce']} | Time: {block['hashing_time']}s")
         return block
@@ -590,7 +584,7 @@ def get_transaction(tx_hash):
             }
     
     return None
-    
+
 # -----------------------
 # NETWORK STATS
 def get_network_stats():
@@ -1396,7 +1390,15 @@ def explorer_txs():
 @app.route("/explorer/block/<identifier>")
 @rate_limit()
 def explorer_block(identifier):
-    # ... código anterior ...
+    """Explorer block detail page"""
+    # Try index first
+    if identifier.isdigit():
+        block = get_block_by_index(int(identifier))
+    else:
+        block = get_block_by_hash(identifier)
+    
+    if not block:
+        return "<h1>Block not found</h1>", 404
     
     tx_html_parts = []
     for i, tx in enumerate(block.get('transactions', [])):
@@ -1425,7 +1427,6 @@ def explorer_block(identifier):
             f'</div>'
             f'</div>'
         )
-
     tx_html = ''.join(tx_html_parts)
 
     html = f'''
