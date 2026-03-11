@@ -539,54 +539,41 @@ def get_block_by_index(index):
 
 def get_transaction(tx_hash):
     """Get transaction by hash from blockchain or mempool"""
+    # Función helper para calcular hash canónico (mismo método en todos lados)
+    def calc_hash(tx):
+        tx_clean = {k: v for k, v in sorted(tx.items()) if k != 'hash'}
+        return sha256(json.dumps(tx_clean, sort_keys=True, separators=(', ', ': ')))
+    
     # Search in blockchain
     chain = load_blockchain()
     for block in chain:
         for tx in block.get('transactions', []):
-            # Primero revisar si la transacción ya tiene hash guardado
-            tx_stored_hash = tx.get('hash')
-            if tx_stored_hash:
-                if tx_stored_hash == tx_hash:
-                    return {
-                        'status': 'confirmed',
-                        'confirmations': len(chain) - block['index'],
-                        'block_index': block['index'],
-                        'block_hash': block['block_hash'],
-                        'timestamp': block['timestamp'],
-                        **tx
-                    }
-            else:
-                # Recalcular ignorando el campo 'hash' si existiera
-                tx_copy = {k: v for k, v in tx.items() if k != 'hash'}
-                if sha256(json.dumps(tx_copy, sort_keys=True)) == tx_hash:
-                    return {
-                        'status': 'confirmed',
-                        'confirmations': len(chain) - block['index'],
-                        'block_index': block['index'],
-                        'block_hash': block['block_hash'],
-                        'timestamp': block['timestamp'],
-                        **tx
-                    }
+            stored = tx.get('hash', '')
+            calculated = calc_hash(tx)
+            # Aceptar si coincide con almacenado O calculado
+            if tx_hash in [stored, calculated]:
+                return {
+                    'status': 'confirmed',
+                    'confirmations': len(chain) - block['index'],
+                    'block_index': block['index'],
+                    'block_hash': block['block_hash'],
+                    'timestamp': block['timestamp'],
+                    'tx_hash': calculated,  # Devolver siempre el hash canónico
+                    **{k: v for k, v in tx.items() if k != 'hash'}  # Sin duplicar hash
+                }
     
-    # Search in mempool
+    # Search in mempool (misma lógica)
     mempool = load_mempool()
     for tx in mempool:
-        tx_stored_hash = tx.get('hash')
-        if tx_stored_hash:
-            if tx_stored_hash == tx_hash:
-                return {
-                    'status': 'pending',
-                    'confirmations': 0,
-                    **tx
-                }
-        else:
-            tx_copy = {k: v for k, v in tx.items() if k != 'hash'}
-            if sha256(json.dumps(tx_copy, sort_keys=True)) == tx_hash:
-                return {
-                    'status': 'pending',
-                    'confirmations': 0,
-                    **tx
-                }
+        stored = tx.get('hash', '')
+        calculated = calc_hash(tx)
+        if tx_hash in [stored, calculated]:
+            return {
+                'status': 'pending',
+                'confirmations': 0,
+                'tx_hash': calculated,
+                **{k: v for k, v in tx.items() if k != 'hash'}
+            }
     
     return None
     
@@ -755,9 +742,13 @@ def create_transaction(sender_priv, sender_pub, sender_addr, recipient, amount, 
         'timestamp': int(time.time())
     }
     
+    # FIRMA - NO SE TOCA
     payload = f'{tx["from"]}{tx["to"]}{tx["amount"]}{tx["nonce"]}'
     tx['signature'] = sign_tx(sender_priv, payload)
-    tx['hash'] = sha256(json.dumps(tx, sort_keys=True))
+    
+    # HASH ID - Normalizar: siempre excluir campo 'hash' si existe
+    tx_clean = {k: v for k, v in sorted(tx.items()) if k != 'hash'}
+    tx['hash'] = sha256(json.dumps(tx_clean, sort_keys=True, separators=(', ', ': ')))
     
     return tx
 
